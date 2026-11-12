@@ -1,0 +1,182 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f3f4f6;
+    color: #1f2937;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 24px;
+    position: center;
+}
+.header h2 {
+    font-size: 3rem;
+    color: #111827;
+}
+.header p {
+    color: #6b7280;
+    font-size: 0.95rem;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Layout Desktop (2 Kolom) */
+@media (min-width: 768px) {
+    .container {
+        grid-template-columns: 350px 1fr;
+    }
+}
+
+.card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.card h2 {
+    font-size: 1.25rem;
+    margin-bottom: 16px;
+    color: #374151;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 8px;
+}
+
+.card h3 {
+    font-size: 1rem;
+    margin-top: 20px;
+    margin-bottom: 8px;
+    color: #4b5563;
+}
+
+/* Tombol Kontrol */
+.controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+button {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#startBtn {
+    background-color: #10b981;
+    color: white;
+}
+
+#startBtn:hover:not(:disabled) {
+    background-color: #059669;
+}
+
+#stopBtn {
+    background-color: #ef4444;
+    color: white;
+}
+
+#stopBtn:hover:not(:disabled) {
+    background-color: #dc2626;
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Status Indikator */
+.status-box {
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
+.status-text {
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.status-text.active {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status-text.inactive {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* Informasi Koordinat */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.info-item {
+    background-color: #f9fafb;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+}
+
+.info-item label {
+    display: block;
+    font-size: 0.75rem;
+    color: #6b7280;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.info-item span {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Log Pergerakan */
+.log-container {
+    height: 150px;
+    overflow-y: auto;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 0.8rem;
+}
+
+.log-item {
+    margin-bottom: 6px;
+    border-bottom: 1px dashed #e5e7eb;
+    padding-bottom: 4px;
+}
+
+.log-item .waktu {
+    color: #6b7280;
+    font-weight: bold;
+}
+
+/* Peta */
+#map {
+    height: 500px;
+    width: 100%;
+    border-radius: 8px;
+}

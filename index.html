@@ -1,0 +1,546 @@
+<?php
+session_start();
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Tracking dengan Foto Tagging</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css"/>
+    <style>
+        .camera-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+        }
+        #cameraStream {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 8px;
+            display: none;
+            margin-bottom: 10px;
+        }
+        .btn-photo {
+            background-color: #059669;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .btn-photo:disabled {
+            background-color: #9ca3af;
+        }
+        .popup-photo {
+            width: 180px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+        .btn-back {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .btn-back:hover {
+            background-color: #1d4ed8; 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+        }
+        .btn-back:active {
+            transform: translateY(0); 
+        }
+        .btn-logout {
+            position: absolute;
+            top: 20px;
+            right: 15px;
+            background-color: #dc2626;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .btn-logout:hover {
+            background-color: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+        }
+        .btn-logout:active {
+            transform: translateY(0);
+        }
+        .user-greeting-box {
+            background: #ffffff;
+            padding: 12px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            font-size: 19px;
+            color: #374151;
+            font-weight: 500;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .user-greeting-box span {
+            color: #0000;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <?php 
+            $jabatan = isset($_SESSION['jabatan']) ? $_SESSION['jabatan'] : 'user'; 
+            if ($jabatan === 'admin') {
+                $target_page = 'dashboard.php';
+                $button_text = 'Kembali';
+                $button_class = 'btn-back';
+                
+            } else {
+                $target_page = 'logout.php';
+                $button_text = 'Logout';
+                $button_class = 'btn-logout';
+            }
+        ?>
+        <a href="<?php echo $target_page; ?>" class="<?php echo $button_class; ?>">
+            <?php echo $button_text; ?>
+        </a>
+        <h2>GPS Tracking</h2>
+        <p>Lacak lokasi dan ambil foto geotagged secara real-time</p>
+    </div>
+    <div class="user-greeting-box">
+            <?php 
+                $nama= isset($_SESSION['nama']) ? $_SESSION['nama']  : 'User';
+                $jabatan_user = isset($_SESSION['jabatan']) ? $_SESSION['jabatan'] : 'user';
+            ?>
+            <span class="user-greeting">Halo, <?php echo htmlspecialchars($nama); ?></span>
+
+    <div class="container">
+        <!-- Panel Kontrol -->
+        <div class="card">
+            <h2>Kontrol Tracking</h2>
+            <div class="controls">
+                <button id="startBtn" onclick="startTracking()">Start Tracking</button>
+                <button id="stopBtn" onclick="stopTracking()" disabled>Stop Tracking</button>
+            </div>
+
+            <div class="status-box">
+                <p>Status: <span id="status" class="status-text inactive">Non-aktif</span></p>
+            </div>
+
+            <!-- Informasi Koordinat -->
+            <div class="info-grid">
+                <div class="info-item">
+                    <label>Latitude</label>
+                    <span id="lat">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Longitude</label>
+                    <span id="lng">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Akurasi</label>
+                    <span id="accuracy">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Kecepatan</label>
+                    <span id="speed">-</span>
+                </div>
+                <div class="info-item">
+                    <label>Total Jarak</label>
+                    <span id="totalDistance">0 meter</span>
+                </div>
+            </div>
+
+            <div class="camera-section">
+                <h3>Ambil Foto</h3>
+                <video id="cameraStream" autoplay playsinline></video>
+                <canvas id="photoCanvas" style="display:none;"></canvas>
+                <div>
+                    <button id="openCamBtn" class="btn-photo" onclick="toggleCamera()">Buka Kamera</button>
+                    <button id="captureBtn" class="btn-photo" onclick="takePhoto()" disabled>Ambil & Simpan Foto</button>
+                    <button id="switchCamBtn" class="btn-photo"  onclick="switchCamera()" style="display:none">Putar Kamera</button>
+                </div>
+            </div>
+
+            <h3>Log Pergerakan & Foto</h3>
+            <div class="log-container" id="logBox">
+                <p style="color: #888;">Belum ada data lokasi.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Peta Real-Time</h2>
+            <div id="map" style="height: 500px;"></div>
+        </div>
+    </div>
+    <audio id="silentAudio" loop>
+        <source src="data:audio/wav;base64,ukUklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" type="audio/wav">
+    </audio>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+    let map, marker, pathLine;
+    let watchId = null;
+    let pathCoordinates = [];
+    let totalDistanceMeters = 0;
+    let currentPosition = null;
+    let videoStream = null;
+    let currentFacingMode = 'environment';
+    let wakelock = null;
+    // 1. Inisialisasi Peta
+    function initMap() {
+        map = L.map('map').setView([-6.2088, 106.8456], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        pathLine = L.polyline([], { color: '#2563eb', weight: 4 }).addTo(map);
+        loadHistoricalRoute();
+    }
+
+    // 2. Mulai Pelacakan GPS
+    function startTracking() {
+        if (!navigator.geolocation) {
+            alert("Geolocation tidak didukung oleh browser Anda.");
+            return;
+        }
+
+        pathCoordinates = [];
+        totalDistanceMeters = 0;
+        document.getElementById('totalDistance').textContent = "0 meter";
+        pathLine.setLatLngs([]);
+
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+        
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = "Aktif (Mencari Sinyal)";
+        statusEl.className = "status-text active";
+
+        watchId = navigator.geolocation.watchPosition(
+            onSuccess, 
+            onError, 
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    // 3. Stop Pelacakan GPS
+    function stopTracking() {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+            watchId = null;
+        }
+
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = "Non-aktif";
+        statusEl.className = "status-text inactive";
+        
+        let distanceText = totalDistanceMeters < 1000 
+            ? `${totalDistanceMeters.toFixed(1)} meter` 
+            : `${(totalDistanceMeters / 1000).toFixed(2)} km`;
+
+        addLog(`Tracking dihentikan. Total jarak: ${distanceText}`);
+    }
+
+    // 4. Callback GPS Berhasil
+    function onSuccess(position) {
+        currentPosition = position;
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const accuracy = position.coords.accuracy.toFixed(1) + " meter";
+        const rawSpeed = position.coords.speed || 0;
+        const speedKmh = (rawSpeed * 3.6).toFixed(1) + " km/jam";
+
+        document.getElementById('lat').textContent = lat.toFixed(6);
+        document.getElementById('lng').textContent = lng.toFixed(6);
+        document.getElementById('accuracy').textContent = accuracy;
+        document.getElementById('speed').textContent = speedKmh;
+
+        const currentLatLng = [lat, lng];
+
+        if (pathCoordinates.length > 0) {
+            const lastLatLng = pathCoordinates[pathCoordinates.length - 1];
+            const segmentDistance = calculateHaversineDistance(
+                lastLatLng[0], lastLatLng[1], 
+                lat, lng
+            );
+            totalDistanceMeters += segmentDistance;
+
+            let displayDist = totalDistanceMeters < 1000 
+                ? `${totalDistanceMeters.toFixed(1)} meter` 
+                : `${(totalDistanceMeters / 1000).toFixed(2)} km`;
+            document.getElementById('totalDistance').textContent = displayDist;
+        }
+
+        if (!marker) {
+            marker = L.marker(currentLatLng).addTo(map)
+                .bindPopup("Lokasi Anda saat ini").openPopup();
+        } else {
+            marker.setLatLng(currentLatLng);
+        }
+
+        pathCoordinates.push(currentLatLng);
+        pathLine.setLatLngs(pathCoordinates);
+        map.panTo(currentLatLng);
+
+        addLog(`Posisi: ${lat.toFixed(5)}, ${lng.toFixed(5)} (Akurasi: ${accuracy})`);
+        sendDataToBackend(lat, lng, rawSpeed, position.coords.accuracy);
+    }
+
+    // 5. Fitur Kamera & Watermark Foto
+    async function toggleCamera() {
+        const video = document.getElementById('cameraStream');
+        const openBtn = document.getElementById('openCamBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const switchBtn = document.getElementById('switchCamBtn'); 
+
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+            video.style.display = 'none';
+            openBtn.textContent = 'Buka Kamera';
+            captureBtn.disabled = true;
+            switchBtn.style.display = 'none'; 
+        } else {
+            await startCamera(currentFacingMode);
+        }
+    }
+
+    async function startCamera(facingMode) {
+        const video = document.getElementById('cameraStream');
+        const openBtn = document.getElementById('openCamBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const switchBtn = document.getElementById('switchCamBtn');
+
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+        }
+
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: facingMode }, 
+                audio: false 
+            });
+            video.srcObject = videoStream;
+            video.style.display = 'block';
+            openBtn.textContent = 'Tutup Kamera';
+            captureBtn.disabled = false;
+            switchBtn.style.display = 'inline-block';
+        } catch (err) {
+            alert('Gagal mengakses kamera: ' + err.message);
+        }
+    }
+
+    function switchCamera() {
+        currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+        startCamera(currentFacingMode);
+    }
+    function takePhoto() {
+    }
+
+    function takePhoto() {
+        if (!currentPosition) {
+            alert("Lokasi GPS belum didapatkan! Mohon tunggu sinyal GPS.");
+            return;
+        }
+
+        const video = document.getElementById('cameraStream');
+        const canvas = document.getElementById('photoCanvas');
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Tambahkan Watermark Lokasi & Waktu pada Foto
+        const lat = currentPosition.coords.latitude.toFixed(6);
+        const lng = currentPosition.coords.longitude.toFixed(6);
+        const timestamp = new Date().toLocaleString('id-ID');
+
+        // Background pita gelap di bawah foto
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+
+        // Teks Informasi
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '16px Arial';
+        ctx.fillText(`Waktu: ${timestamp}`, 15, canvas.height - 35);
+        ctx.fillText(`GPS: ${lat}, ${lng}`, 15, canvas.height - 12);
+
+        // Ubah canvas menjadi Data URL (Base64)
+        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+        // Tampilkan foto di Marker Peta
+        const photoMarker = L.marker([lat, lng]).addTo(map);
+        photoMarker.bindPopup(`
+            <div>
+                <b>Foto Geotagged</b><br>
+                <small>${timestamp}</small><br>
+                <img src="${imageDataUrl}" class="popup-photo"/>
+            </div>
+        `).openPopup();
+
+        // Kirim foto ke Backend PHP
+        sendPhotoToBackend(imageDataUrl, lat, lng, timestamp);
+        addLog(`Foto berhasil diambil pada (${lat}, ${lng})`);
+    }
+
+    // 6. Rumus Haversine (Jarak)
+    function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371e3;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    // 7. Utility Functions
+    function onError(error) {
+        let errorMsg = "Gagal mengambil lokasi.";
+        switch(error.code) {
+            case error.PERMISSION_DENIED: errorMsg = "Izin akses lokasi ditolak."; break;
+            case error.POSITION_UNAVAILABLE: errorMsg = "Informasi lokasi tidak tersedia."; break;
+            case error.TIMEOUT: errorMsg = "Waktu permintaan lokasi habis."; break;
+        }
+        addLog(`Error: ${errorMsg}`);
+    }
+
+    function addLog(text) {
+        const logBox = document.getElementById('logBox');
+        const time = new Date().toLocaleTimeString('id-ID');
+        const logItem = document.createElement('div');
+        logItem.className = 'log-item';
+        logItem.innerHTML = `<span class="waktu">[${time}]</span> ${text}`;
+        if (logBox.children.length === 1 && logBox.children[0].tagName === 'P') {
+            logBox.innerHTML = '';
+        }
+        logBox.prepend(logItem);
+    }
+
+    function sendDataToBackend(lat, lng, spd, acc) {
+        fetch('save_location.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `latitude=${lat}&longitude=${lng}&total_distance=${totalDistanceMeters}&accuracy=${acc}`
+        }).catch(err => console.error('Gagal mengirim ke PHP:', err));
+    }
+
+    function sendPhotoToBackend(imageBase64, lat, lng, timestamp) {
+        fetch('save_photo.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `image=${encodeURIComponent(imageBase64)}&latitude=${lat}&longitude=${lng}&timestamp=${encodeURIComponent(timestamp)}`
+        }).catch(err => console.error('Gagal menyimpan foto:', err));
+    }
+
+    function loadHistoricalRoute() {
+        fetch('get_locations.php')
+            .then(response => response.json())
+            .then(result => {
+                if (result.status ===  "success" && result.data.length > 0) {
+                    pathCoordinates = result.data;
+                    pathLine.setLatLngs(pathCoordinates);
+                    const lastPoint = pathCoordinates[pathCoordinates.length - 1];
+                    map.setView(lastPoint, 15);
+                    marker = L.marker(lastPoint).addTo(map)
+                        .bindPopup("Titik Terakhir Perjalanan").openPopup();
+                    addLog(`Berhasil memuat ${pathCoordinates.length} titik rute riwayat.`);
+                }
+            })
+            .catch(err => console.error("Gagal mengambil riwayat rute:", err));
+    }
+
+    window.onload = initMap;
+    function muatDataOtomatis() {
+        fetch('get_live_location.php')
+            .then(response => response.text())
+            .then(htmlData => {
+                document.getElementById('tabel-lokasi').innerHTML = htmlData;
+            })
+        .   catch(error => console.error('Gagal memperbarui data:', error));
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        muatDataOtomatis();    
+        setInterval(muatDataOtomatis, 3000);
+    });
+    function setupBackButton() {
+        const backBtn = document.getElementById('backButton');
+        const userRole = localStorage.getItem('user_role') || 'admin';
+        
+        if (userRole === 'admin') {
+            backBtn.href = 'dashboard.php';
+            backBtn.textContent = '← Kembali ke Dashboard Admin';
+        } else {
+            backBtn.href = 'user_dashboard.php'; 
+            backBtn.textContent = '← Kembali ke Menu Utama';
+        }
+    }
+
+    // Panggil fungsi saat halaman dimuat
+    window.onload = function() {
+        initMap();
+        setupBackButton();
+    };
+
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('wake Lock aktif: Layar/CPU dijaga agar tetap aktif.');
+                
+                wakeLock.addEventListener('release', () => {
+                    console.log('Wake Lock dilepas oleh sistem.');
+                });
+            }
+        } catch (err) {
+            console.error('${err.name}, ${err.message}');
+        }
+    }
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+        requestWakeLock();
+        mulaiTrackingGPS();
+    });
+
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState == 'visible') {
+            await requestWakeLock();
+        }
+    });
+
+    function playSilentAudio() {
+        const audio = document.getElementById('silentaudio');
+        audio.play().catch(e => console.log("Audio autoplay dicegah browser:", e));
+    }
+    </script>
+</body>
+</html>
